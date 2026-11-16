@@ -1,0 +1,49 @@
+name: Ingest Airflow GitHub issues
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Ingestion mode (full replays all history)'
+        required: true
+        default: incremental
+        type: choice
+        options: [incremental, full]
+  schedule:
+    - cron: '17 2 * * *'
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: opsforge-github-ingestion
+  cancel-in-progress: false
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: requirements-ingestion.txt
+      - run: pip install -r requirements-ingestion.txt
+      - name: Authenticate to Azure with workload identity
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - name: Ingest issues and comments
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          AZURE_STORAGE_ACCOUNT: ${{ vars.AZURE_STORAGE_ACCOUNT }}
+          AZURE_STORAGE_CONTAINER: github-issues-raw
+          GITHUB_SOURCE_REPO: apache/airflow
+        run: |
+          python scripts/ingest_github_issues.py --mode "${{ inputs.mode || 'incremental' }}"
