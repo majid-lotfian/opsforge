@@ -17,7 +17,7 @@ from urllib.parse import urlparse
 
 import requests
 from azure.core.exceptions import ResourceNotFoundError
-from azure.identity import DefaultAzureCredential
+from azure.identity import ClientAssertionCredential
 from azure.storage.blob import BlobServiceClient, ContentSettings
 
 LOG = logging.getLogger("opsforge.ingest")
@@ -108,6 +108,20 @@ def comments_for_issue(session: requests.Session, issue: dict) -> list[dict]:
     return result
 
 
+def get_fresh_github_assertion() -> str:
+    """Request a fresh short-lived OIDC assertion for Azure token renewal."""
+    response = requests.get(
+        os.environ["ACTIONS_ID_TOKEN_REQUEST_URL"],
+        params={"audience": "api://AzureADTokenExchange"},
+        headers={
+            "Authorization": f'Bearer {os.environ["ACTIONS_ID_TOKEN_REQUEST_TOKEN"]}'
+        },
+        timeout=30,
+    )
+    response.raise_for_status()
+    return response.json()["value"]
+
+
 def run(args: argparse.Namespace) -> None:
     token = os.environ.get("GITHUB_TOKEN")
     if not token:
@@ -118,7 +132,11 @@ def run(args: argparse.Namespace) -> None:
     if repository.count("/") != 1:
         raise ValueError("GITHUB_SOURCE_REPO must be owner/repository")
     owner, repo = repository.split("/")
-    credential = DefaultAzureCredential(exclude_interactive_browser_credential=True)
+    credential = ClientAssertionCredential(
+        tenant_id=os.environ["AZURE_TENANT_ID"],
+        client_id=os.environ["AZURE_CLIENT_ID"],
+        func=get_fresh_github_assertion,
+    )
     client = BlobServiceClient(f"https://{account}.blob.core.windows.net", credential=credential)
     container = client.get_container_client(container_name)
     # The private container must exist already. No account keys or connection strings.
