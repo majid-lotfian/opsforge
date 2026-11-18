@@ -106,7 +106,7 @@ comments = (raw
 def upsert(df, table_name, keys):
     """Idempotent latest-snapshot upsert into a managed Unity Catalog Delta table."""
     if not spark.catalog.tableExists(table_name.replace("`", "")):
-        (df.limit(0).write.format("delta").mode("errorifexists").saveAsTable(table_name))
+        (df.limit(0).write.format("delta").mode("ignore").saveAsTable(table_name))
     condition = " AND ".join(f"target.`{key}` = source.`{key}`" for key in keys)
     (DeltaTable.forName(spark, table_name).alias("target")
        .merge(df.alias("source"), condition)
