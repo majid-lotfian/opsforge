@@ -4,9 +4,8 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
     azure_openai_endpoint: str
     azure_openai_api_key: str
-    azure_openai_deployment: str
-    azure_openai_embedding_deployment: str
-    azure_openai_api_version: str = "2024-10-21"
+    azure_openai_deployment: str = "opsforge-chat"
+    azure_openai_embedding_deployment: str = "opsforge-embedding"
     databricks_server_hostname: str
     databricks_http_path: str
     databricks_token: str
