@@ -1,0 +1,6 @@
+fastapi>=0.115,<1
+uvicorn[standard]>=0.30,<1
+pydantic-settings>=2.5,<3
+openai>=1.60,<3
+databricks-sql-connector>=4,<5
+numpy>=1.26,<3
