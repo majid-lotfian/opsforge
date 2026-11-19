@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>OpsForge | Incident Intelligence</title>
+<style>
+:root{font-family:Inter,system-ui,sans-serif;color:#e9eef8;background:#0c1220}
+body{max-width:1000px;margin:40px auto;padding:0 20px}h1{font-size:2.2rem;margin-bottom:0}
+small,p{color:#a8b5cc}main{display:grid;grid-template-columns:1fr 1fr;gap:22px;margin-top:28px}
+section{background:#182337;border:1px solid #2a3b55;border-radius:16px;padding:24px}
+label{display:block;margin:20px 0 8px}input,textarea{width:100%;box-sizing:border-box;background:#0c1628;border:1px solid #42536a;color:white;border-radius:8px;padding:12px;font:inherit}
+textarea{min-height:180px}button{margin-top:18px;padding:12px 20px;background:#4f80ed;color:white;border:0;border-radius:8px;font-weight:bold;cursor:pointer}
+button:disabled{opacity:.5}pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:.9rem}a{color:#95b8ff}
+@media(max-width:750px){main{grid-template-columns:1fr}}
+</style></head><body><header><h1>OpsForge</h1><p>Evidence-grounded incident investigation · Apache Airflow historical issues</p></header>
+<main><section><h2>Investigate an incident</h2><form id="form">
+<label for="title">Incident title</label><input id="title" minlength="5" maxlength="300" required placeholder="e.g. Scheduler fails to start">
+<label for="description">Symptoms and context</label><textarea id="description" minlength="10" maxlength="10000" required placeholder="Describe errors, impact and observations"></textarea>
+<button id="submit">Analyze incident</button></form></section>
+<section><h2>Investigation</h2><p id="status">Submit an incident to see evidence-based recommendations.</p><div id="result"></div></section></main>
+<script>
+const form=document.querySelector('#form'),result=document.querySelector('#result'),status=document.querySelector('#status'),button=document.querySelector('#submit');
+function line(label,value){const p=document.createElement('p');const strong=document.createElement('strong');strong.textContent=label+': ';p.append(strong,document.createTextNode(Array.isArray(value)?value.join('; '):String(value??'Not available')));result.append(p)}
+form.addEventListener('submit',async e=>{e.preventDefault();button.disabled=true;result.replaceChildren();status.textContent='Analyzing historical incidents…';
+try{const response=await fetch('/api/analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:form.title?.value||document.querySelector('#title').value,description:document.querySelector('#description').value})});
+if(!response.ok)throw new Error('Analysis failed (HTTP '+response.status+')');
+const data=await response.json();status.textContent='Analysis complete';
+for(const key of ['summary','category','severity','confidence','likely_causes','recommended_steps','missing_information'])line(key.replaceAll('_',' '),data[key]);
+const h=document.createElement('h3');h.textContent='Historical evidence';result.append(h);
+for(const source of data.sources||[]){const p=document.createElement('p'),a=document.createElement('a');a.href=source.url;a.target='_blank';a.rel='noopener noreferrer';a.textContent='#'+source.issue_number+' '+source.title;p.append(a);result.append(p)}
+}catch(err){status.textContent=err.message}finally{button.disabled=false}});
+</script></body></html>
