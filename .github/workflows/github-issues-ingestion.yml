@@ -49,3 +49,41 @@ jobs:
           GITHUB_SOURCE_REPO: apache/airflow
         run: |
           python scripts/ingest_github_issues.py --mode "${{ inputs.mode || 'incremental' }}"
+
+  refresh-delta:
+    name: Refresh Databricks Delta tables
+    needs: ingest
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: production
+    steps:
+      - name: Authenticate to Azure with workload identity
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - name: Trigger OpsForge Databricks job
+        env:
+          DATABRICKS_HOST: https://adb-7405617910632941.1.azuredatabricks.net
+          DATABRICKS_JOB_ID: "252004057179258"
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Azure Databricks first-party resource/application ID.
+          token="$(az account get-access-token --resource 2ff814a6-3304-4ab8-85cb-cd0e6f879c1d --query accessToken -o tsv)"
+          response_file="$(mktemp)"
+          status="$(curl --silent --show-error --output "$response_file" --write-out '%{http_code}' \
+            --request POST \
+            --header "Authorization: Bearer $token" \
+            --header "Content-Type: application/json" \
+            --data "{\"job_id\":$DATABRICKS_JOB_ID}" \
+            "$DATABRICKS_HOST/api/2.1/jobs/run-now")"
+          if [[ "$status" != "200" ]]; then
+            echo "::error::Databricks run-now failed (HTTP $status). Check workspace service principal access and job CAN MANAGE RUN permission."
+            cat "$response_file"
+            exit 1
+          fi
+          echo "Databricks accepted job run request:"
+          cat "$response_file"
+          echo
