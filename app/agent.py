@@ -1,14 +1,13 @@
 """Evidence-grounded incident analysis. No autonomous infrastructure changes."""
 import json
 import re
-from openai import AzureOpenAI
+from openai import OpenAI
 from .config import settings
 from .data import search_issues, issue_comments
 
-client = AzureOpenAI(
-    azure_endpoint=settings.azure_openai_endpoint,
+client = OpenAI(
+    base_url=settings.azure_openai_endpoint.rstrip("/") + "/",
     api_key=settings.azure_openai_api_key,
-    api_version=settings.azure_openai_api_version,
 )
 
 SYSTEM = """You are OpsForge, an IT incident investigator.
@@ -48,7 +47,6 @@ def analyze(title: str, description: str) -> dict:
         })
     response = client.chat.completions.create(
         model=settings.azure_openai_deployment,
-        temperature=0,
         response_format={"type": "json_object"},
         messages=[
             {"role": "system", "content": SYSTEM},
