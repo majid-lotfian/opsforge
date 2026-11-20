@@ -76,7 +76,7 @@ def vector_search_issues(vector: list[float], limit: int = 8) -> list[dict]:
         SELECT i.issue_id, i.issue_number, i.title, i.body, i.state,
                i.url, i.updated_at, {similarity} AS similarity
         FROM {_index_table()} e
-        INNER JOIN \`{catalog}\`.\`{schema}\`.\`github_issues\` i
+        INNER JOIN `{catalog}`.`{schema}`.`github_issues` i
           ON i.issue_id = e.issue_id
         WHERE size(e.embedding) = ?
         ORDER BY similarity DESC
