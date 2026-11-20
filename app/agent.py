@@ -8,7 +8,7 @@ import math
 import re
 from openai import OpenAI
 from .config import settings
-from .data import search_issues, issue_comments
+from .data import search_issues, issue_comments, index_is_complete, vector_search_issues
 
 log = logging.getLogger(__name__)
 client = OpenAI(
@@ -26,6 +26,8 @@ confidence must be one of high/medium/low.
 likely_causes must be an array of objects with keys: cause, rationale,
 supporting_issue_numbers. List hypotheses, not confirmed root causes.
 recommended_steps and missing_information must be arrays of strings.
+Prioritize at most 4 likely causes, 7 actionable recommended steps, and 5 missing inputs.
+Be concise, avoid repetition, and distinguish fixes from diagnostic checks.
 Only cite a historical issue if its actual contents DIRECTLY support the relevant
 claim; an issue sharing a generic word or describing a different subsystem
 is not supporting evidence. It is acceptable to cite zero issues.
@@ -106,11 +108,34 @@ def _rank_candidates(title: str, description: str, candidates: list[dict]):
         return [row for row, score in scored if score > 0][:6], "lexical_fallback"
 
 def analyze(title: str, description: str) -> dict:
-    candidates = {}
-    for term in _terms(title, description):
-        for row in search_issues(term, 12):
-            candidates[row["issue_id"]] = row
-    selected, retrieval_method = _rank_candidates(title, description, list(candidates.values()))
+    selected = []
+    retrieval_method = "no_matches"
+    try:
+        if index_is_complete():
+            query_text = (title + "\n" + description)[:2200]
+            vector = client.embeddings.create(
+                model=settings.azure_openai_embedding_deployment,
+                input=query_text,
+            ).data[0].embedding
+            norm = math.sqrt(sum(x * x for x in vector))
+            if norm:
+                unit = [round(float(x / norm), 8) for x in vector]
+                selected = vector_search_issues(unit, limit=8)[:6]
+                if selected:
+                    retrieval_method = "full_corpus_semantic"
+    except Exception:
+        # Missing/partial index or a Databricks SQL incompatibility should
+        # not break the previously verified retrieval workflow.
+        log.warning("Full-corpus vector retrieval unavailable; using hybrid fallback")
+
+    if not selected:
+        candidates = {}
+        for term in _terms(title, description):
+            for row in search_issues(term, 12):
+                candidates[row["issue_id"]] = row
+        selected, retrieval_method = _rank_candidates(
+            title, description, list(candidates.values())
+        )
     evidence = []
     for issue in selected:
         comments = issue_comments(issue["issue_id"], 12)
