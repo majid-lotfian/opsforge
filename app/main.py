@@ -1,4 +1,9 @@
 from pathlib import Path
+import logging
+import uuid
+import time
+
+log = logging.getLogger('uvicorn.error')
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
@@ -25,9 +30,15 @@ def health():
 
 @app.post("/api/analyze")
 def analyze_incident(incident: Incident):
+    request_id = uuid.uuid4().hex
+    started = time.monotonic()
     try:
-        return analyze(incident.title, incident.description)
+        result = analyze(incident.title, incident.description)
+        result['request_id'] = request_id
+        log.info('investigation id=%s duration_ms=%d method=%s', request_id, (time.monotonic()-started)*1000, result.get('retrieval_method'))
+        return result
     except Exception as exc:
+        log.error('investigation failed id=%s error_type=%s', request_id, type(exc).__name__)
         # Never leak Azure/Databricks credentials or raw connector exceptions to callers.
         raise HTTPException(status_code=502, detail="Incident analysis failed; inspect server logs") from exc
 
