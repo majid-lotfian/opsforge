@@ -69,7 +69,7 @@ def _write_statement(query, parameters=()):
         response = request(url + "/" + response["statement_id"])
     if response["status"]["state"] != "SUCCEEDED":
         error = response["status"].get("error", {})
-        raise RuntimeError("Databricks write failed: " + str(error.get("error_code", response["status"]["state"])))
+        raise RuntimeError("Databricks write failed: " + str(error.get("error_code", response["status"]["state"])) + ": " + str(error.get("message", ""))[:1500])
 
 
 def _index_batch(cursor, client, issues: list[dict]) -> None:
@@ -123,12 +123,7 @@ def run(batch_size: int, max_issues: int) -> None:
     pending = []
     try:
         with connection.cursor() as cur:
-            _write_statement(f"""
-                CREATE TABLE IF NOT EXISTS {TABLE} (
-                    issue_id BIGINT, content_hash STRING,
-                    embedding ARRAY<FLOAT>, indexed_at TIMESTAMP
-                ) USING DELTA
-            """)
+            # Table provisioned in SQL Editor; administrative job only updates rows.
             cur.execute(f"SELECT issue_id, content_hash FROM {TABLE}")
             existing = {int(issue_id): digest for issue_id, digest in cur.fetchall()}
             print(f"OpsForge index: {len(existing):,} existing embeddings", flush=True)
