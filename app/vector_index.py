@@ -54,7 +54,7 @@ def _write_statement(query, parameters=()):
                "parameters": [{"name": f"p{i}", "value": str(v),
                                "type": "BIGINT" if isinstance(v, int) else "STRING"}
                               for i, v in enumerate(parameters)]}
-    headers = {"Authorization": "Bearer " + settings.databricks_token,
+    headers = {"Authorization": "Bearer " + settings.databricks_write_token,
                "Content-Type": "application/json"}
     def request(address, body=None):
         req = urllib.request.Request(address, data=body, headers=headers)
@@ -107,6 +107,8 @@ def _index_batch(cursor, client, issues: list[dict]) -> None:
 
 
 def run(batch_size: int, max_issues: int) -> None:
+    if not settings.databricks_write_token:
+        raise RuntimeError("DATABRICKS_WRITE_TOKEN is required for indexing")
     client = OpenAI(
         base_url=settings.azure_openai_endpoint.rstrip("/") + "/",
         api_key=settings.azure_openai_api_key,
