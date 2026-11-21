@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     databricks_server_hostname: str
     databricks_http_path: str
     databricks_token: str
+    databricks_write_token: str | None = None
     databricks_catalog: str = "dbw_opsforge"
     databricks_schema: str = "opsforge_monitoring"
     cors_origins: str = "http://localhost:5173,http://localhost:8000"
