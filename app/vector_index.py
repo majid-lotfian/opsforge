@@ -13,6 +13,8 @@ import json
 import logging
 import math
 import time
+import urllib.request
+import urllib.error
 
 from databricks import sql
 from openai import OpenAI
@@ -36,6 +38,38 @@ def _normalize(vector: list[float]) -> list[float]:
     if not n:
         raise ValueError("Received zero-length embedding vector")
     return [round(float(x / n), 8) for x in vector]
+
+
+def _write_statement(query, parameters=()):
+    host = settings.databricks_server_hostname.rstrip("/")
+    if not host.startswith("https://"):
+        host = "https://" + host
+    url = host + "/api/2.0/sql/statements"
+    warehouse = settings.databricks_http_path.rstrip("/").split("/")[-1]
+    # Convert positional markers to named Statement Execution API parameters.
+    for i in range(len(parameters)):
+        query = query.replace("?", f":p{i}", 1)
+    payload = {"warehouse_id": warehouse, "statement": query,
+               "wait_timeout": "30s", "on_wait_timeout": "CONTINUE",
+               "parameters": [{"name": f"p{i}", "value": str(v),
+                               "type": "BIGINT" if isinstance(v, int) else "STRING"}
+                              for i, v in enumerate(parameters)]}
+    headers = {"Authorization": "Bearer " + settings.databricks_token,
+               "Content-Type": "application/json"}
+    def request(address, body=None):
+        req = urllib.request.Request(address, data=body, headers=headers)
+        with urllib.request.urlopen(req, timeout=90) as response:
+            return json.load(response)
+    response = request(url, json.dumps(payload).encode())
+    deadline = time.monotonic() + 600
+    while response["status"]["state"] in ("PENDING", "RUNNING"):
+        if time.monotonic() >= deadline:
+            raise TimeoutError("Databricks statement still pending; check query history before retry")
+        time.sleep(2)
+        response = request(url + "/" + response["statement_id"])
+    if response["status"]["state"] != "SUCCEEDED":
+        error = response["status"].get("error", {})
+        raise RuntimeError("Databricks write failed: " + str(error.get("error_code", response["status"]["state"])))
 
 
 def _index_batch(cursor, client, issues: list[dict]) -> None:
@@ -69,7 +103,7 @@ def _index_batch(cursor, client, issues: list[dict]) -> None:
       VALUES (incoming.issue_id, incoming.content_hash,
               incoming.embedding, current_timestamp())
     """
-    cursor.execute(query, parameters=items)
+    _write_statement(query, items)
 
 
 def run(batch_size: int, max_issues: int) -> None:
@@ -89,7 +123,7 @@ def run(batch_size: int, max_issues: int) -> None:
     pending = []
     try:
         with connection.cursor() as cur:
-            cur.execute(f"""
+            _write_statement(f"""
                 CREATE TABLE IF NOT EXISTS {TABLE} (
                     issue_id BIGINT, content_hash STRING,
                     embedding ARRAY<FLOAT>, indexed_at TIMESTAMP
