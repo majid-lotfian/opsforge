@@ -44,13 +44,13 @@ def _index_table() -> str:
     return f"{settings.databricks_catalog}.{settings.databricks_schema}.github_issue_embeddings"
 
 def index_is_complete() -> bool:
-    """Only switch to full-corpus retrieval once the initial batch has finished."""
+    """Allow minor ingestion drift after the bulk index is available."""
     indexed = _query(f"SELECT COUNT(*) AS n FROM {_index_table()}")[0]["n"]
     total = _query(
         f"SELECT COUNT(*) AS n FROM "
         f"{settings.databricks_catalog}.{settings.databricks_schema}.github_issues"
     )[0]["n"]
-    return total > 0 and indexed >= total
+    return total > 0 and indexed >= max(100, int(total * 0.99))
 
 def vector_search_issues(vector: list[float], limit: int = 8) -> list[dict]:
     """Exact full-table cosine search over normalized precomputed embeddings.
