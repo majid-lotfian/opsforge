@@ -112,8 +112,10 @@ def analyze(title: str, description: str) -> dict:
     started = time.monotonic()
     selected = []
     retrieval_method = "no_matches"
+    vector_status = "not_attempted"
     try:
         if index_is_complete():
+            vector_status = "searching"
             query_text = (title + "\n" + description)[:2200]
             vector = client.embeddings.create(
                 model=settings.azure_openai_embedding_deployment,
@@ -125,10 +127,15 @@ def analyze(title: str, description: str) -> dict:
                 selected = vector_search_issues(unit, limit=8)[:6]
                 if selected:
                     retrieval_method = "full_corpus_semantic"
-    except Exception:
-        # Missing/partial index or a Databricks SQL incompatibility should
-        # not break the previously verified retrieval workflow.
-        log.warning("Full-corpus vector retrieval unavailable; using hybrid fallback")
+                    vector_status = "completed"
+                else:
+                    vector_status = "empty_results"
+        else:
+            vector_status = "incomplete_index"
+    except Exception as exc:
+        # Retain availability but expose a diagnostic category, without leaking SQL details.
+        vector_status = "error:" + type(exc).__name__
+        log.exception("Full-corpus vector retrieval failed; using hybrid fallback")
 
     if not selected:
         candidates = {}
@@ -205,6 +212,7 @@ def analyze(title: str, description: str) -> dict:
     ]
     result["retrieved_count"] = len(evidence)
     result["retrieval_method"] = retrieval_method
+    result["vector_status"] = vector_status
     result["review_status"] = review_status
     usages = [u for u in (response.usage, review_usage) if u is not None]
     result["metrics"] = {
