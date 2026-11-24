@@ -31,7 +31,7 @@ flowchart TD
 
 ## Operations
 
-The API is deployed from GHCR by GitHub Actions using Azure federated identity and commit-specific image tags. The indexing job is configured separately in Azure Container Apps Jobs with a daily schedule (06:00 UTC, verify it follows ingestion). Its initial configuration uses the latest image tag; immutable job deployment is not yet integrated into CI/CD.
+The API is deployed from GHCR by GitHub Actions using Azure federated identity and commit-specific image tags. The indexing job is configured separately in Azure Container Apps Jobs with a daily schedule (06:00 UTC, verify it follows ingestion). Its initial configuration uses the latest image tag. CI/CD now includes a separate immutable indexer deployment job, gated by AZURE_INDEXER_DEPLOY_ENABLED=true. Before enabling it, grant the existing federated deployment identity Container Apps Contributor scoped to the indexing job. Verify the workflow and configured image after enabling.
 
 ### Indexer
 
@@ -56,7 +56,7 @@ Required configuration (use secret references for credentials):
 | DATABRICKS_CATALOG | Catalog |
 | DATABRICKS_SCHEMA | Schema |
 
-Keep the write credential restricted to indexing. Remove it from the API container only after successful standalone job verification. Do not commit credentials. Verify API authentication before external exposure; CORS is not authentication.
+Keep the write credential restricted to indexing. Standalone indexing has succeeded and removal of the API write credential has been initiated. Verify API functionality and removal of unused secrets and older active revision references before declaring separation complete. Do not commit credentials. Verify API authentication before external exposure; CORS is not authentication.
 
 ### API
 
@@ -78,7 +78,7 @@ Provide independently reviewed JSONL cases with title, description and relevant_
 
 - Initial full index: 15,509 issues successfully indexed in the observed deployment.
 - Full-corpus semantic retrieval observed on an Airflow scheduler incident.
-- Scheduled job configured; successful standalone execution and ingestion ordering remain to be verified.
+- Scheduled execution succeeded on 2026-11-24 at 06:00 UTC: 15,512 scanned, 3 changed and embedded, 58 seconds application runtime (94 seconds platform execution duration). Ingestion ordering remains to be verified. Earlier embedding authentication failures are unresolved historically, although the successful execution and subsequent direct authentication check confirm current functionality.
 - Independent evaluation and production security review remain outstanding.
 
 ## Limitations
