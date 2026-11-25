@@ -36,10 +36,24 @@ def run(url, cases):
             rows.append({"case": i, "error": type(exc).__name__})
         print(json.dumps(rows[-1]), flush=True)
     valid = [r for r in rows if "error" not in r]
-    return {"cases": len(rows), "successful": len(valid),
-            "mean": {k: statistics.mean(r[k] for r in valid) for k in
-                     ("precision", "recall", "hit", "latency_s")} if valid else {},
-            "results": rows}
+    output = {"cases": len(rows), "successful": len(valid),
+              "mean": {k: statistics.mean(r[k] for r in valid) for k in
+                       ("precision", "recall", "hit", "latency_s")} if valid else {},
+              "results": rows}
+    if valid:
+        output["latency_seconds"] = {
+            "median": statistics.median(r["latency_s"] for r in valid),
+            "p95_nearest_rank": sorted(r["latency_s"] for r in valid)[(95 * len(valid) + 99) // 100 - 1],
+        }
+        output["tokens"] = {
+            key: sum(int(r["metrics"].get(key) or 0) for r in valid)
+            for key in ("chat_input_tokens", "chat_output_tokens")
+        }
+        output["retrieval_methods"] = {
+            method: sum(r["method"] == method for r in valid)
+            for method in sorted({r["method"] for r in valid if r["method"]})
+        }
+    return output
 
 if __name__ == "__main__":
     p = argparse.ArgumentParser()
