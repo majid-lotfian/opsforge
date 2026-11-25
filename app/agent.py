@@ -9,7 +9,7 @@ import re
 import time
 from openai import OpenAI
 from .config import settings
-from .data import search_issues, issue_comments, index_is_complete, vector_search_issues
+from .data import search_issues, issue_comments_batch, index_is_complete, vector_search_issues
 
 log = logging.getLogger(__name__)
 client = OpenAI(
@@ -146,8 +146,9 @@ def analyze(title: str, description: str) -> dict:
             title, description, list(candidates.values())
         )
     evidence = []
+    grouped_comments = issue_comments_batch([issue["issue_id"] for issue in selected], 12)
     for issue in selected:
-        comments = issue_comments(issue["issue_id"], 12)
+        comments = grouped_comments[issue["issue_id"]]
         evidence.append({
             "issue_number": issue["issue_number"],
             "title": issue["title"],
