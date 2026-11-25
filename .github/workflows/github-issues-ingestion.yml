@@ -54,7 +54,7 @@ jobs:
     name: Refresh Databricks Delta tables
     needs: ingest
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 120
     environment: production
     steps:
       - name: Authenticate to Azure with workload identity
@@ -84,6 +84,52 @@ jobs:
             cat "$response_file"
             exit 1
           fi
-          echo "Databricks accepted job run request:"
-          cat "$response_file"
-          echo
+          run_id="$(jq -er '.run_id' "$response_file")"
+          echo "Databricks run: $run_id"
+          for ((attempt=0; attempt<210; attempt++)); do
+            token="$(az account get-access-token --resource 2ff814a6-3304-4ab8-85cb-cd0e6f879c1d --query accessToken -o tsv)"
+            response="$(curl --fail --silent --show-error --retry 3 --header "Authorization: Bearer $token" "$DATABRICKS_HOST/api/2.1/jobs/runs/get?run_id=$run_id")"
+            lifecycle="$(jq -er '.state.life_cycle_state' <<< "$response")"
+            result="$(jq -r '.state.result_state // ""' <<< "$response")"
+            echo "Databricks: $lifecycle $result"
+            case "$lifecycle" in
+              TERMINATED|SKIPPED|INTERNAL_ERROR)
+                [[ "$result" == "SUCCESS" ]] && exit 0
+                exit 1 ;;
+            esac
+            sleep 30
+          done
+          echo "::error::Timed out waiting for Databricks ingestion"
+          exit 1
+
+  refresh-index:
+    name: Refresh semantic index
+    needs: refresh-delta
+    if: vars.AZURE_INDEXER_ORCHESTRATION_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 250
+    steps:
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Start and monitor indexer
+        shell: bash
+        run: |
+          set -euo pipefail
+          args=(--resource-group rg-opsforge-dev --name opsforge-indexer-dev)
+          execution="$(az containerapp job start "${args[@]}" --query name -o tsv)"
+          test -n "$execution"
+          echo "Indexer execution: $execution"
+          for ((attempt=0; attempt<480; attempt++)); do
+            status="$(az containerapp job execution show "${args[@]}" --job-execution-name "$execution" --query properties.status -o tsv)"
+            echo "Indexer: $status"
+            case "$status" in
+              Succeeded) exit 0 ;;
+              Failed|Stopped|Canceled|Cancelled|Degraded) exit 1 ;;
+            esac
+            sleep 30
+          done
+          echo "::error::Timed out waiting for indexing"
+          exit 1
