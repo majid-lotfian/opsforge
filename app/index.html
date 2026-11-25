@@ -50,6 +50,12 @@ if(!response.ok)throw new Error('Analysis failed (HTTP '+response.status+')');
 const data=await response.json();status.textContent='Analysis complete';
 for(const key of ['summary','category','severity','confidence','likely_causes','recommended_steps','missing_information'])line(key,data[key]);
 if(data.retrieval_method)line('retrieval_method',data.retrieval_method);
+const diagnostics=document.createElement('details');
+const summary=document.createElement('summary');summary.textContent='Performance and review diagnostics';diagnostics.append(summary);
+const metrics=data.metrics||{};
+const fields=[['Request ID',data.request_id],['Vector status',data.vector_status],['Review status',data.review_status],['Retrieved incidents',data.retrieved_count],['Retrieval time (ms)',metrics.retrieval_ms],['Analysis time (ms)',metrics.total_ms],['Chat input tokens',metrics.chat_input_tokens],['Chat output tokens',metrics.chat_output_tokens]];
+for(const [label,value] of fields){const p=document.createElement('p');p.textContent=label+': '+(value??'Not available');diagnostics.append(p)}
+result.append(diagnostics);
 const h=document.createElement('h3');h.textContent='Historical evidence';result.append(h);
 for(const source of data.sources||[]){const p=document.createElement('p'),a=document.createElement('a');a.href=source.url;a.target='_blank';a.rel='noopener noreferrer';a.textContent='#'+source.issue_number+' '+source.title;p.append(a);result.append(p)}
 }catch(err){status.textContent=err.message}finally{button.disabled=false}});
