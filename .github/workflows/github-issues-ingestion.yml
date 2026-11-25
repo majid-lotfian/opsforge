@@ -101,35 +101,3 @@ jobs:
           done
           echo "::error::Timed out waiting for Databricks ingestion"
           exit 1
-
-  refresh-index:
-    name: Refresh semantic index
-    needs: refresh-delta
-    if: vars.AZURE_INDEXER_ORCHESTRATION_ENABLED == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 250
-    steps:
-      - uses: azure/login@v2
-        with:
-          client-id: ${{ vars.AZURE_CLIENT_ID }}
-          tenant-id: ${{ vars.AZURE_TENANT_ID }}
-          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
-      - name: Start and monitor indexer
-        shell: bash
-        run: |
-          set -euo pipefail
-          args=(--resource-group rg-opsforge-dev --name opsforge-indexer-dev)
-          execution="$(az containerapp job start "${args[@]}" --query name -o tsv)"
-          test -n "$execution"
-          echo "Indexer execution: $execution"
-          for ((attempt=0; attempt<480; attempt++)); do
-            status="$(az containerapp job execution show "${args[@]}" --job-execution-name "$execution" --query properties.status -o tsv)"
-            echo "Indexer: $status"
-            case "$status" in
-              Succeeded) exit 0 ;;
-              Failed|Stopped|Canceled|Cancelled|Degraded) exit 1 ;;
-            esac
-            sleep 30
-          done
-          echo "::error::Timed out waiting for indexing"
-          exit 1
