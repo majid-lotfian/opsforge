@@ -31,7 +31,7 @@ flowchart TD
 
 ## Operations
 
-The API is deployed from GHCR by GitHub Actions using Azure federated identity and commit-specific image tags. The indexing job is configured separately in Azure Container Apps Jobs with a daily schedule (06:00 UTC, verify it follows ingestion). Its initial configuration uses the latest image tag. CI/CD now includes a separate immutable indexer deployment job, gated by AZURE_INDEXER_DEPLOY_ENABLED=true. Before enabling it, grant the existing federated deployment identity Container Apps Contributor scoped to the indexing job. Verify the workflow and configured image after enabling.
+The API is deployed from GHCR by GitHub Actions using Azure federated identity and commit-specific image tags. The indexing job is configured separately in Azure Container Apps Jobs with a daily schedule (06:00 UTC, verify it follows ingestion). CI/CD deploys the indexer using commit-specific image tags through a separate deployment job, gated by AZURE_INDEXER_DEPLOY_ENABLED=true. The federated deployment identity requires Container Apps Jobs Contributor scoped to the indexing job (and Container Apps Contributor scoped separately to the API). Both deployment jobs and the indexer image verification succeeded in workflow run 45384646078.
 
 ### Indexer
 
@@ -78,7 +78,7 @@ Provide independently reviewed JSONL cases with title, description and relevant_
 
 - Initial full index: 15,509 issues successfully indexed in the observed deployment.
 - Full-corpus semantic retrieval observed on an Airflow scheduler incident.
-- Scheduled execution succeeded on 2026-11-24 at 06:00 UTC: 15,512 scanned, 3 changed and embedded, 58 seconds application runtime (94 seconds platform execution duration). Ingestion ordering remains to be verified. Earlier embedding authentication failures are unresolved historically, although the successful execution and subsequent direct authentication check confirm current functionality.
+- Scheduled execution succeeded on 2026-11-24 at 06:00 UTC: 15,512 scanned, 3 changed and embedded, 58 seconds application runtime (94 seconds platform execution duration). GitHub ingestion is scheduled at 02:17 UTC and triggers Databricks asynchronously; indexing starts independently at 06:00 UTC. This is not a guaranteed completion dependency. Earlier embedding authentication failures are unresolved historically, although the successful execution and subsequent direct authentication check confirm current functionality.
 - Independent evaluation and production security review remain outstanding.
 
 ## Limitations
