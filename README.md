@@ -79,6 +79,8 @@ Provide independently reviewed JSONL cases with title, description and relevant_
 - Initial full index: 15,509 issues successfully indexed in the observed deployment.
 - Full-corpus semantic retrieval observed on an Airflow scheduler incident.
 - Scheduled execution succeeded on 2026-11-24 at 06:00 UTC: 15,512 scanned, 3 changed and embedded, 58 seconds application runtime (94 seconds platform execution duration). GitHub ingestion is scheduled at 02:17 UTC and triggers Databricks asynchronously; indexing starts independently at 06:00 UTC. This is not a guaranteed completion dependency. Earlier embedding authentication failures are unresolved historically, although the successful execution and subsequent direct authentication check confirm current functionality.
+- CI includes credential-free regression tests for SQL query assembly and query-count behavior. These do not replace integration tests against the deployed Databricks warehouse.
+- Evaluation CLI reports mean cited-evidence precision/recall/hit and end-to-end latency, plus median/p95 latency, retrieval-method counts and chat token totals when available. No independent labeled benchmark or comparative accuracy measurements have been collected yet.
 - Independent evaluation and production security review remain outstanding.
 
 ## Limitations
