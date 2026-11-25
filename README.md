@@ -69,10 +69,10 @@ Analysis responses contain historical evidence, hypotheses, recommended steps, m
 ## Evaluation
 
 ```bash
-python -m app.evaluate --url "$OPSFORGE_URL" --cases labeled_cases.jsonl --output evaluation.json
+python -m app.evaluate --url "$OPSFORGE_URL" --cases evaluation/cases.jsonl --output evaluation.json
 ```
 
-Provide independently reviewed JSONL cases with title, description and relevant_issue_numbers. The evaluator currently measures cited-evidence overlap, not all retrieved candidates or confirmed diagnostic accuracy. Labels may be incomplete; report this limitation. Measure warm and cold warehouse latency separately, and report chat token use alongside retrieval latency. Do not interpret model confidence as a calibrated probability.
+The repository includes 12 source-grounded draft cases in `evaluation/cases.jsonl`, with paraphrased symptoms and verified reference issue numbers. They test search over known historical incidents, not generalization to unseen incidents. Independent expert review and additional relevance judgments remain necessary. The evaluator currently measures cited-evidence overlap, not all retrieved candidates or confirmed diagnostic accuracy. Labels may be incomplete; report this limitation. Measure warm and cold warehouse latency separately, and report chat token use alongside retrieval latency. Do not interpret model confidence as a calibrated probability.
 
 ## Validation status
 
@@ -80,7 +80,7 @@ Provide independently reviewed JSONL cases with title, description and relevant_
 - Runtime validation on 2026-11-25: the deployed web interface returned an investigation with retrieval_method `full_corpus_semantic`, high severity, medium confidence and historical citations #13529, #21397 and #26834. All three GitHub issues were verified to exist. This confirms the request and full-corpus retrieval path worked, not that diagnostic hypotheses were correct or latency improved. Issue #13529 discusses scheduler deadlock following an upgrade but does not directly establish the generated timezone/default-timestamp explanation; the citation is overly broad and requires review. No response-time or token metrics were captured from this manual UI run.
 - Scheduled execution succeeded on 2026-11-24 at 06:00 UTC: 15,512 scanned, 3 changed and embedded, 58 seconds application runtime (94 seconds platform execution duration). GitHub ingestion is scheduled at 02:17 UTC and triggers Databricks asynchronously; indexing starts independently at 06:00 UTC. This is not a guaranteed completion dependency. Earlier embedding authentication failures are unresolved historically, although the successful execution and subsequent direct authentication check confirm current functionality.
 - CI includes credential-free regression tests for SQL query assembly and query-count behavior. These do not replace integration tests against the deployed Databricks warehouse.
-- Evaluation CLI reports mean cited-evidence precision/recall/hit and end-to-end latency, plus median/p95 latency, retrieval-method counts and chat token totals when available. No independent labeled benchmark or comparative accuracy measurements have been collected yet.
+- Evaluation CLI reports mean cited-evidence precision/recall/hit and end-to-end latency, plus median/p95 latency, retrieval-method counts and chat token totals when available. A draft benchmark dataset is available; no independently validated or comparative accuracy measurements have been collected yet.
 - Independent evaluation and production security review remain outstanding.
 
 ## Limitations
